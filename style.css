@@ -1,0 +1,91 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #111;
+  color: #eee;
+  font: 16px/1.4 system-ui, sans-serif;
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 16px 24px;
+}
+
+#word {
+  display: flex;
+  align-items: center;
+  height: 32vh;
+  margin: 0 -16px;
+  overflow: hidden;
+  white-space: nowrap;
+  font: clamp(20px, 6.4vw, 48px) / 1 ui-monospace, Menlo, Consolas, monospace;
+}
+
+#word .before { flex: 0 0 40%; text-align: right; }
+#word .after { flex: 1; min-width: 0; }
+
+#word .focal {
+  position: relative;
+  color: #e53935;
+}
+
+#word .focal::before,
+#word .focal::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 2px;
+  height: 0.5em;
+  margin-left: -1px;
+  background: #444;
+}
+
+#word .focal::before { top: -0.9em; }
+#word .focal::after { bottom: -0.9em; }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+button, input, textarea {
+  font: inherit;
+  color: inherit;
+  min-height: 44px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1e1e1e;
+}
+
+button { padding: 0 20px; }
+#play { flex: 1; font-weight: 600; }
+
+#progress, #wpm-label {
+  min-width: 7ch;
+  text-align: right;
+  color: #999;
+  font-variant-numeric: tabular-nums;
+}
+
+#wpm {
+  flex: 1;
+  border: 0;
+  background: none;
+  accent-color: #e53935;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+#file {
+  flex: 1;
+  min-width: 0;
+  padding: 8px;
+}
