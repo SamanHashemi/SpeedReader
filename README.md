@@ -9,7 +9,7 @@ Plain HTML, CSS, and JavaScript. No build step, no dependencies at runtime.
 Open https://samanhashemi.github.io/SpeedReader/ in Safari.
 
 1. Tap Open a .txt file and pick one. Its name appears above the Play button.
-2. Tap Play. Tap again to pause. When the text ends the button reads Replay.
+2. Tap Play to start and Pause to stop. When the text ends, Play reads Replay.
 3. Drag the slider to change the speed, from 100 to 1000 words per minute. It takes effect at once, even while playing.
 
 The counter under the word shows how far along you are.

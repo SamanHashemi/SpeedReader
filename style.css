@@ -62,7 +62,9 @@ button, input, #open {
 }
 
 button { padding: 0 20px; }
+button:disabled { opacity: 0.4; }
 #play { flex: 1; font-weight: 600; }
+#pause { flex: 0 0 5.5em; padding: 0; }
 
 #progress, #wpm-label {
   min-width: 7ch;
