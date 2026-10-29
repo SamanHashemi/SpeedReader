@@ -6,7 +6,7 @@ Plain HTML, CSS, and JavaScript. No build step, no dependencies at runtime.
 
 ## Use it on a phone
 
-Open https://samanhashemi.github.io/speedreader/ in Safari.
+Open https://samanhashemi.github.io/SpeedReader/ in Safari.
 
 1. Paste text into the box and tap Load, or tap the file picker and choose a .txt file.
 2. Tap Play. Tap again to pause. When the text ends the button reads Replay.
