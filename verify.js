@@ -61,6 +61,7 @@ async function check(name, fn) {
 
 const text = (page, sel) => page.evaluate((s) => document.querySelector(s).textContent, sel);
 const scrollWidth = (page) => page.evaluate(() => document.documentElement.scrollWidth);
+const disabled = (page, sel) => page.evaluate((s) => document.querySelector(s).disabled, sel);
 let fileCount = 0;
 async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount++}.txt`) {
   const file = path.join(os.tmpdir(), name);
@@ -84,6 +85,8 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     assert.strictEqual(await text(page, '#title'), '');
     const box = await page.locator('label[for="file"]').boundingBox();
     assert(box.height === 44 && box.width === 390 - 32, `open label ${box.width}x${box.height}`);
+    const pauseBox = await page.locator('#pause').boundingBox();
+    assert(pauseBox.height >= 44, `pause button ${pauseBox.width}x${pauseBox.height}`);
     const w = await scrollWidth(page);
     assert(w <= 390, `scrollWidth ${w}`);
   });
@@ -144,7 +147,7 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     });
     await page.click('#play');
     await page.waitForTimeout(60000);
-    await page.click('#play');
+    await page.click('#pause');
     const [renders, elapsed] = await page.evaluate(() => [window.__renders, performance.now() - window.__t0]);
     const progress = await text(page, '#progress');
     console.log(`  measured ${renders} words, progress ${progress}, elapsed ${elapsed.toFixed(0)}ms`);
@@ -155,9 +158,15 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     assert.strictEqual(await text(page, '#play'), 'Play');
     await openFile(page, 'one two three');
     await page.fill('#wpm', '1000');
+    assert.strictEqual(await text(page, '#play'), 'Play');
+    assert.strictEqual(await disabled(page, '#pause'), true, 'pause disabled before play');
     await page.click('#play');
+    const [playDisabled, pauseDisabled] = await page.evaluate(() => [document.querySelector('#play').disabled, document.querySelector('#pause').disabled]);
+    assert.strictEqual(playDisabled, true, 'play disabled while playing');
+    assert.strictEqual(pauseDisabled, false, 'pause enabled while playing');
     await page.waitForFunction(() => document.querySelector('#play').textContent === 'Replay', null, { timeout: 600 });
     assert.strictEqual(await text(page, '#progress'), '3 / 3');
+    assert.strictEqual(await disabled(page, '#pause'), true, 'pause disabled after the text ends');
   });
 
   await check('resume keeps the paused word on screen', async () => {
@@ -165,12 +174,12 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     await page.fill('#wpm', '100');
     await page.click('#play');
     await page.waitForFunction(() => document.querySelector('#progress').textContent === '2 / 4', null, { timeout: 2000 });
-    await page.click('#play');
+    await page.click('#pause');
     assert.strictEqual(await text(page, '#word'), 'two');
     await page.click('#play');
     await page.waitForTimeout(200);
     assert.strictEqual(await text(page, '#word'), 'two');
-    await page.click('#play');
+    await page.click('#pause');
   });
 
   const rows = () => page.locator('#library li');
@@ -188,7 +197,7 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     await page.fill('#wpm', '1000');
     await page.click('#play');
     await progressAtLeast(20);
-    await page.click('#play');
+    await page.click('#pause');
     saved = await text(page, '#progress');
     assert.strictEqual(await text(page, '#wpm-label'), '1000 wpm');
     await page.reload();
