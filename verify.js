@@ -372,6 +372,48 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     await page.click('#pause');
   });
 
+  await check('tap goes back a sentence while paused', async () => {
+    await page.fill('#wpm', '1000');
+    assert.strictEqual(await playUntil(page, '9 / 10'), 'nine');
+    for (const [word, progress] of [['eight', '8 / 10'], ['four', '4 / 10'], ['one', '1 / 10'], ['one', '1 / 10']]) {
+      await page.click('#word');
+      assert.strictEqual(await text(page, '#word'), word);
+      assert.strictEqual(await text(page, '#progress'), progress);
+    }
+    await page.reload();
+    assert.strictEqual(await text(page, '#progress'), '1 / 10', 'the tap saved');
+  });
+
+  await check('tap while playing keeps playing from the earlier sentence', async () => {
+    await page.fill('#wpm', '100');
+    assert.strictEqual(await playUntil(page, '6 / 10'), 'six');
+    const { word, progress, paused } = await page.evaluate(() => {
+      document.querySelector('#play').click();
+      document.querySelector('#word').click();
+      return {
+        word: document.querySelector('#word').textContent,
+        progress: document.querySelector('#progress').textContent,
+        paused: document.querySelector('#pause').disabled,
+      };
+    });
+    assert.strictEqual(word, 'one');
+    assert.strictEqual(progress, '1 / 10');
+    assert.strictEqual(paused, false, 'still playing after the tap');
+    await page.waitForFunction(() => document.querySelector('#progress').textContent === '2 / 10', null, { timeout: 2000 });
+    await page.click('#pause');
+  });
+
+  await check('tap on a finished book steps back into it', async () => {
+    await page.fill('#wpm', '1000');
+    await page.click('#play');
+    await page.waitForFunction(() => document.querySelector('#play').textContent === 'Replay', null, { timeout: 2000 });
+    assert.strictEqual(await text(page, '#progress'), '10 / 10');
+    await page.click('#word');
+    assert.strictEqual(await text(page, '#word'), 'eight');
+    assert.strictEqual(await text(page, '#progress'), '8 / 10');
+    assert.strictEqual(await text(page, '#play'), 'Play');
+  });
+
   await browser.close();
   server.close();
   process.exitCode = failed ? 1 : 0;
