@@ -53,7 +53,7 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
   const file = path.join(os.tmpdir(), name);
   fs.writeFileSync(file, t);
   await page.setInputFiles('#file', file);
-  await page.waitForFunction((p) => document.querySelector('#progress').textContent === p, `0 / ${count(t)}`, { timeout: 2000 });
+  await page.waitForFunction((p) => document.querySelector('#title').textContent === p, name.replace(/\.txt$/i, ''), { timeout: 2000 });
   fs.unlinkSync(file);
 }
 
@@ -61,12 +61,8 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
   const server = await serve();
   const base = `http://127.0.0.1:${server.address().port}/`;
   const browser = await chromium.launch();
-  const page = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 3,
-    isMobile: true,
-    hasTouch: true,
-  });
+  const device = { viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true };
+  let page = await browser.newPage(device);
   page.on('pageerror', (e) => console.log(`page error: ${e.message}`));
 
   await check('page loads empty', async () => {
@@ -162,6 +158,88 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     await page.waitForTimeout(200);
     assert.strictEqual(await text(page, '#word'), 'two');
     await page.click('#play');
+  });
+
+  const rows = () => page.locator('#library li');
+  const progressAtLeast = (n) =>
+    page.waitForFunction((min) => parseInt(document.querySelector('#progress').textContent, 10) >= min, n, { timeout: 5000 });
+  const memoryText = sample(100);
+  let saved;
+
+  await check('progress survives reload', async () => {
+    await page.context().close();
+    page = await (await browser.newContext(device)).newPage();
+    page.on('pageerror', (e) => console.log(`page error: ${e.message}`));
+    await page.goto(base);
+    await openFile(page, memoryText, 'Memory test.txt');
+    await page.fill('#wpm', '1000');
+    await page.click('#play');
+    await progressAtLeast(20);
+    await page.click('#play');
+    saved = await text(page, '#progress');
+    assert.strictEqual(await text(page, '#wpm-label'), '1000 wpm');
+    await page.reload();
+    assert.strictEqual(await text(page, '#title'), 'Memory test');
+    assert.strictEqual(await text(page, '#progress'), saved);
+    assert.strictEqual(await text(page, '#wpm-label'), '1000 wpm');
+    assert.strictEqual(await text(page, '#play'), 'Play');
+  });
+
+  await check('library lists books and switches', async () => {
+    await openFile(page, sample(40), 'Second book.txt');
+    assert.strictEqual(await rows().count(), 2);
+    assert.strictEqual(await text(page, '#library li:first-child .name'), 'Second book');
+    assert(await rows().first().evaluate((li) => li.classList.contains('current')), 'first row is current');
+    assert.strictEqual(await text(page, '#progress'), '0 / 40');
+    const w = await scrollWidth(page);
+    assert(w <= 390, `scrollWidth ${w}`);
+    await page.locator('#library .book', { hasText: 'Memory test' }).click();
+    assert.strictEqual(await text(page, '#title'), 'Memory test');
+    assert.strictEqual(await text(page, '#progress'), saved);
+    assert.strictEqual(await text(page, '#wpm-label'), '1000 wpm');
+  });
+
+  await check('same text under a new name resumes', async () => {
+    await openFile(page, memoryText, 'Renamed.txt');
+    assert.strictEqual(await text(page, '#progress'), saved);
+    assert.strictEqual(await rows().count(), 2);
+    assert.strictEqual(await page.locator('#library .book', { hasText: 'Renamed' }).count(), 1);
+    assert.strictEqual(await page.locator('#library .book', { hasText: 'Memory test' }).count(), 0);
+  });
+
+  await check('hiding the page pauses and saves', async () => {
+    await page.click('#play');
+    await progressAtLeast(parseInt(saved, 10) + 5);
+    const hidden = await page.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+      return document.querySelector('#progress').textContent;
+    });
+    assert.strictEqual(await text(page, '#play'), 'Play');
+    await page.reload();
+    assert.strictEqual(await text(page, '#progress'), hidden);
+    assert.notStrictEqual(hidden, saved);
+  });
+
+  await check('remove forgets a book', async () => {
+    const id = await page.locator('#library .book', { hasText: 'Second book' }).getAttribute('data-id');
+    await page.locator(`#library .remove[data-id="${id}"]`).click();
+    assert.strictEqual(await rows().count(), 1);
+    await page.reload();
+    assert.strictEqual(await rows().count(), 1);
+    const keys = await page.evaluate(() => Object.keys(localStorage));
+    assert(!keys.some((k) => k.endsWith(id)), `keys ${keys.join(', ')}`);
+    assert.strictEqual(await text(page, '#title'), 'Renamed');
+  });
+
+  await check('fresh browser starts empty', async () => {
+    const context = await browser.newContext(device);
+    const fresh = await context.newPage();
+    await fresh.goto(base);
+    assert.strictEqual(await text(fresh, '#progress'), '0 / 0');
+    assert.strictEqual(await fresh.locator('#library li').count(), 0);
+    assert.strictEqual(await text(fresh, '#title'), '');
+    await context.close();
   });
 
   await browser.close();

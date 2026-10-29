@@ -14,13 +14,15 @@ Open https://samanhashemi.github.io/SpeedReader/ in Safari.
 
 The counter under the word shows how far along you are.
 
+The app remembers where you are and your speed for each file. Your files are listed under the Open button, newest first, and tapping one switches to it. When you come back, the app reopens the last file you read. Tap × next to a file to forget it. All of this lives in Safari on your phone, so clearing website data removes it.
+
 ## Verify
 
 ```
 node verify.js
 ```
 
-The script needs Node 22 and Playwright 1.63.0 with Chromium. It serves this folder, opens it at iPhone size (390 by 844), and checks the file load, focal alignment, slider, and button states. It then plays 600 words at 300 wpm for a minute and checks that between 285 and 315 words appeared. It prints one `ok` or `FAIL` line per check and takes about 70 seconds.
+The script needs Node 22 and Playwright 1.63.0 with Chromium. It serves this folder, opens it at iPhone size (390 by 844), and checks the file load, focal alignment, slider, and button states. It then plays 600 words at 300 wpm for a minute and checks that between 285 and 315 words appeared. Last it checks that progress, speed, and the file list survive a reload, and that a fresh browser starts empty. It prints one `ok` or `FAIL` line per check and takes about 70 seconds.
 
 ## Deploy
 
