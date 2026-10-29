@@ -1,11 +1,11 @@
-const state = { words: [], index: 0, wpm: 300, playing: false };
+const state = { words: [], index: 0, wpm: 300, playing: false, title: '' };
 
 let timer = 0;
 let anchorTime = 0;
 let anchorIndex = 0;
 
 const el = {};
-for (const id of ['text', 'load', 'file', 'word', 'play', 'wpm', 'wpm-label', 'progress']) {
+for (const id of ['file', 'word', 'title', 'play', 'wpm', 'wpm-label', 'progress']) {
   el[id] = document.getElementById(id);
 }
 const before = el.word.querySelector('.before');
@@ -24,12 +24,13 @@ function done() {
 }
 
 function render() {
-  const { words, index, wpm, playing } = state;
+  const { words, index, wpm, playing, title } = state;
   const word = words[Math.max(0, index - 1)] || '';
   const i = orpIndex(word.length);
   before.textContent = word.slice(0, i);
   focal.textContent = word.slice(i, i + 1);
   after.textContent = word.slice(i + 1);
+  el.title.textContent = title;
   el.play.textContent = playing ? 'Pause' : words.length && done() ? 'Replay' : 'Play';
   el.progress.textContent = `${index} / ${words.length}`;
   el['wpm-label'].textContent = `${wpm} wpm`;
@@ -59,8 +60,9 @@ function tick() {
   render();
 }
 
-function load(text) {
+function load(text, title) {
   clearTimeout(timer);
+  state.title = title.replace(/\.txt$/i, '');
   state.words = text.split(/\s+/).filter(Boolean);
   state.index = 0;
   state.playing = false;
@@ -81,10 +83,10 @@ function pause() {
   render();
 }
 
-el.load.addEventListener('click', () => load(el.text.value));
 el.file.addEventListener('change', async () => {
   const file = el.file.files[0];
-  if (file) load(await file.text());
+  if (file) load(await file.text(), file.name);
+  el.file.value = '';
 });
 el.play.addEventListener('click', () => (state.playing ? pause() : play()));
 el.wpm.addEventListener('input', () => {

@@ -52,7 +52,7 @@ main {
   gap: 12px;
 }
 
-button, input, textarea {
+button, input, #open {
   font: inherit;
   color: inherit;
   min-height: 44px;
@@ -78,14 +78,25 @@ button { padding: 0 20px; }
   accent-color: #e53935;
 }
 
-textarea {
-  width: 100%;
-  padding: 10px 12px;
-  resize: vertical;
+#title {
+  min-height: 1.4em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: #999;
+}
+
+#open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 #file {
-  flex: 1;
-  min-width: 0;
-  padding: 8px;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  opacity: 0;
+  overflow: hidden;
 }

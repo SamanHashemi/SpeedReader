@@ -11,6 +11,7 @@
 <body>
 <main>
   <div id="word"><span class="before"></span><span class="focal"></span><span class="after"></span></div>
+  <output id="title"></output>
   <div class="row">
     <button id="play" type="button">Play</button>
     <output id="progress">0 / 0</output>
@@ -19,11 +20,8 @@
     <input id="wpm" type="range" min="100" max="1000" step="10" value="300">
     <label for="wpm" id="wpm-label">300 wpm</label>
   </div>
-  <textarea id="text" rows="4" placeholder="Paste text here"></textarea>
-  <div class="row">
-    <button id="load" type="button">Load</button>
-    <input id="file" type="file" accept=".txt,text/plain">
-  </div>
+  <label for="file" id="open">Open a .txt file</label>
+  <input id="file" type="file" accept=".txt,text/plain">
 </main>
 </body>
 </html>

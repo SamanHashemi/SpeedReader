@@ -48,9 +48,13 @@ async function check(name, fn) {
 
 const text = (page, sel) => page.evaluate((s) => document.querySelector(s).textContent, sel);
 const scrollWidth = (page) => page.evaluate(() => document.documentElement.scrollWidth);
-async function loadText(page, t) {
-  await page.fill('#text', t);
-  await page.click('#load');
+let fileCount = 0;
+async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount++}.txt`) {
+  const file = path.join(os.tmpdir(), name);
+  fs.writeFileSync(file, t);
+  await page.setInputFiles('#file', file);
+  await page.waitForFunction((p) => document.querySelector('#progress').textContent === p, `0 / ${count(t)}`, { timeout: 2000 });
+  fs.unlinkSync(file);
 }
 
 (async () => {
@@ -68,19 +72,26 @@ async function loadText(page, t) {
   await check('page loads empty', async () => {
     await page.goto(base);
     assert.strictEqual(await text(page, '#progress'), '0 / 0');
+    assert.strictEqual(await text(page, '#title'), '');
+    const box = await page.locator('label[for="file"]').boundingBox();
+    assert(box.height === 44 && box.width === 390 - 32, `open label ${box.width}x${box.height}`);
     const w = await scrollWidth(page);
     assert(w <= 390, `scrollWidth ${w}`);
   });
 
-  await check('paste and load', async () => {
+  await check('open txt file loads words', async () => {
     const t = sample(400);
-    await loadText(page, t);
+    await openFile(page, t, 'Quick brown fox.txt');
     assert.strictEqual(await text(page, '#progress'), `0 / ${count(t)}`);
+    assert.strictEqual(await text(page, '#title'), 'Quick brown fox');
+    await openFile(page, t, `${'a-very-long-file-name-'.repeat(6)}.txt`);
+    const w = await scrollWidth(page);
+    assert(w <= 390, `scrollWidth ${w}`);
   });
 
   await check('orp index per word', async () => {
     for (const w of ['a', 'to', 'word', 'reading', 'recognition', 'extraordinary']) {
-      await loadText(page, w);
+      await openFile(page, w);
       const i = orpIndex(w.length);
       assert.strictEqual(await text(page, '#word .focal'), w[i], `focal of ${w}`);
       assert.strictEqual((await text(page, '#word .before')).length, i, `before of ${w}`);
@@ -90,21 +101,13 @@ async function loadText(page, t) {
   await check('focal x fixed, no horizontal scroll', async () => {
     const lefts = [];
     for (const w of ['I', 'we', 'read', 'reading', 'extraordinary', 'incomprehensibilities']) {
-      await loadText(page, w);
+      await openFile(page, w);
       lefts.push(await page.evaluate(() => document.querySelector('#word .focal').getBoundingClientRect().left));
     }
     const spread = Math.max(...lefts) - Math.min(...lefts);
     assert(spread <= 1, `focal lefts ${lefts.map((x) => x.toFixed(2)).join(', ')}`);
     const w = await scrollWidth(page);
     assert(w <= 390, `scrollWidth ${w}`);
-  });
-
-  await check('upload txt file', async () => {
-    const file = path.join(os.tmpdir(), `speed-reader-${process.pid}.txt`);
-    fs.writeFileSync(file, sample(50));
-    await page.setInputFiles('#file', file);
-    await page.waitForFunction(() => document.querySelector('#progress').textContent === '0 / 50', null, { timeout: 2000 });
-    fs.unlinkSync(file);
   });
 
   await check('slider range and label', async () => {
@@ -116,7 +119,7 @@ async function loadText(page, t) {
   });
 
   await check('300 wpm shows 285..315 words in 60s', async () => {
-    await loadText(page, sample(600));
+    await openFile(page, sample(600));
     await page.fill('#wpm', '300');
     await page.evaluate(() => {
       const el = document.querySelector('#word');
@@ -141,7 +144,7 @@ async function loadText(page, t) {
 
   await check('button text play, pause, replay', async () => {
     assert.strictEqual(await text(page, '#play'), 'Play');
-    await loadText(page, 'one two three');
+    await openFile(page, 'one two three');
     await page.fill('#wpm', '1000');
     await page.click('#play');
     await page.waitForFunction(() => document.querySelector('#play').textContent === 'Replay', null, { timeout: 600 });
@@ -149,7 +152,7 @@ async function loadText(page, t) {
   });
 
   await check('resume keeps the paused word on screen', async () => {
-    await loadText(page, 'one two three four');
+    await openFile(page, 'one two three four');
     await page.fill('#wpm', '100');
     await page.click('#play');
     await page.waitForFunction(() => document.querySelector('#progress').textContent === '2 / 4', null, { timeout: 2000 });
