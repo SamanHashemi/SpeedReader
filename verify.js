@@ -169,7 +169,7 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     assert.strictEqual(await disabled(page, '#pause'), true, 'pause disabled after the text ends');
   });
 
-  await check('resume keeps the paused word on screen', async () => {
+  await check('resume shows the sentence start for a full interval', async () => {
     await openFile(page, 'one two three four');
     await page.fill('#wpm', '100');
     await page.click('#play');
@@ -177,8 +177,9 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     await page.click('#pause');
     assert.strictEqual(await text(page, '#word'), 'two');
     await page.click('#play');
+    assert.strictEqual(await text(page, '#word'), 'one');
     await page.waitForTimeout(200);
-    assert.strictEqual(await text(page, '#word'), 'two');
+    assert.strictEqual(await text(page, '#word'), 'one');
     await page.click('#pause');
   });
 
@@ -307,6 +308,68 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     const wpm = (shown.length / pacingElapsed) * 60000;
     console.log(`  measured ${wpm.toFixed(0)} wpm over ${shown.length} words in ${pacingElapsed.toFixed(0)}ms`);
     assert(Math.abs(wpm - 300) <= 30, `${wpm.toFixed(0)} wpm`);
+  });
+
+  // Pausing from inside the page, in the same task as the render that reached
+  // the target, pins the paused word exactly. A round trip from the test would
+  // let a 40 ms word slip past at 1000 wpm.
+  const playUntil = (page, target) =>
+    page.evaluate(
+      (t) =>
+        new Promise((resolve) => {
+          const progress = document.querySelector('#progress');
+          const observer = new MutationObserver(() => {
+            if (progress.textContent !== t) return;
+            observer.disconnect();
+            document.querySelector('#pause').click();
+            resolve(document.querySelector('#word').textContent);
+          });
+          observer.observe(progress, { childList: true, characterData: true, subtree: true });
+          document.querySelector('#play').click();
+        }),
+      target,
+    );
+  // The read happens in the same tick as the click, before the first timer
+  // fires, then again 20 ms later while the first word should still hold.
+  const resume = (page) =>
+    page.evaluate(async () => {
+      const read = () => [document.querySelector('#word').textContent, document.querySelector('#progress').textContent];
+      document.querySelector('#play').click();
+      const [word, progress] = read();
+      await new Promise((r) => setTimeout(r, 20));
+      return { word, progress, later: read()[0] };
+    });
+  const sentencesText = 'one two three. four five six seven. eight nine ten.';
+
+  await check('resume restarts the sentence', async () => {
+    await openFile(page, sentencesText, 'Sentences.txt');
+    await page.fill('#wpm', '1000');
+    assert.strictEqual(await playUntil(page, '6 / 10'), 'six');
+    const { word, progress, later } = await resume(page);
+    assert.strictEqual(word, 'four');
+    assert.strictEqual(progress, '4 / 10');
+    assert.strictEqual(later, 'four', 'still showing after 20 ms');
+    await page.click('#pause');
+  });
+
+  await check('resume at a sentence start stays put', async () => {
+    await page.click('#play');
+    await page.waitForFunction(() => document.querySelector('#play').textContent === 'Replay', null, { timeout: 2000 });
+    assert.strictEqual(await playUntil(page, '4 / 10'), 'four');
+    const { word, progress } = await resume(page);
+    assert.strictEqual(word, 'four');
+    assert.strictEqual(progress, '4 / 10');
+    await page.click('#pause');
+  });
+
+  await check('reopen resumes at the sentence', async () => {
+    assert.strictEqual(await playUntil(page, '6 / 10'), 'six');
+    await page.reload();
+    assert.strictEqual(await text(page, '#progress'), '6 / 10');
+    const { word, progress } = await resume(page);
+    assert.strictEqual(word, 'four');
+    assert.strictEqual(progress, '4 / 10');
+    await page.click('#pause');
   });
 
   await browser.close();

@@ -65,21 +65,30 @@ function orpIndex(len) {
 const PACE = {
   short: 0.8,
   long: 1.3,
-  paragraph: 2.5,
-  end: { '.': 2, '!': 2, '?': 2, ',': 1.5, ';': 1.5, ':': 1.5, '\u2013': 1.5, '\u2014': 1.5 },
+  end: { paragraph: 2.5, sentence: 2, clause: 1.5 },
 };
+const END_KIND = { '.': 'sentence', '!': 'sentence', '?': 'sentence', ',': 'clause', ';': 'clause', ':': 'clause', '\u2013': 'clause', '\u2014': 'clause' };
 
-function rawWeight(text, endsParagraph) {
-  const length = text.length <= 3 ? PACE.short : text.length >= 10 ? PACE.long : 1;
+// What a word ends: 'paragraph', 'sentence', 'clause', or '' for a plain word.
+function endKind(text, endsParagraph) {
+  if (endsParagraph) return 'paragraph';
   const last = text.replace(/["'\u201d\u2019)\]}]+$/, '').slice(-1);
-  return length * (endsParagraph ? PACE.paragraph : PACE.end[last] || 1);
+  return END_KIND[last] || '';
+}
+
+function rawWeight(text, end) {
+  const length = text.length <= 3 ? PACE.short : text.length >= 10 ? PACE.long : 1;
+  return length * (PACE.end[end] || 1);
 }
 
 function tokenize(text) {
   const words = [];
   for (const paragraph of text.split(/\n\s*\n/)) {
     const texts = paragraph.split(/\s+/).filter(Boolean);
-    texts.forEach((t, i) => words.push({ text: t, weight: rawWeight(t, i === texts.length - 1) }));
+    texts.forEach((t, i) => {
+      const end = endKind(t, i === texts.length - 1);
+      words.push({ text: t, end, weight: rawWeight(t, end) });
+    });
   }
   // Weights are scaled to a mean of exactly 1, so N on the slider is still N
   // words per minute over the book. Pacing only moves time between words.
@@ -94,6 +103,12 @@ function tokenize(text) {
 
 function done() {
   return state.index >= state.words.length;
+}
+
+function sentenceStart(i) {
+  let j = i;
+  while (j > 0 && !['sentence', 'paragraph'].includes(state.words[j - 1].end)) j -= 1;
+  return j;
 }
 
 function row(entry) {
@@ -209,6 +224,9 @@ function remove(id) {
 function play() {
   if (!state.words.length) return;
   if (done()) state.index = 0;
+  // A reader who comes back mid-sentence has lost the thread, so the stream
+  // backs up to the first word of the sentence they were in.
+  else if (state.index > 0) state.index = sentenceStart(state.index - 1) + 1;
   state.playing = true;
   anchor();
   render();
