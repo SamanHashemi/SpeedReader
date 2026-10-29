@@ -6,7 +6,7 @@ let anchorTime = 0;
 let anchorIndex = 0;
 
 const el = {};
-for (const id of ['file', 'word', 'title', 'play', 'wpm', 'wpm-label', 'progress', 'library']) {
+for (const id of ['file', 'word', 'title', 'play', 'pause', 'wpm', 'wpm-label', 'progress', 'library']) {
   el[id] = document.getElementById(id);
 }
 const before = el.word.querySelector('.before');
@@ -88,7 +88,9 @@ function render() {
   focal.textContent = word.slice(i, i + 1);
   after.textContent = word.slice(i + 1);
   el.title.textContent = book ? book.title : '';
-  el.play.textContent = playing ? 'Pause' : words.length && done() ? 'Replay' : 'Play';
+  el.play.textContent = words.length && done() ? 'Replay' : 'Play';
+  el.play.disabled = playing;
+  el.pause.disabled = !playing;
   el.progress.textContent = `${index} / ${words.length}`;
   el['wpm-label'].textContent = `${wpm} wpm`;
   const sorted = library.slice().sort((a, b) => b.openedAt - a.openedAt);
@@ -191,7 +193,8 @@ el.file.addEventListener('change', async () => {
   if (file) open(await file.text(), file.name.replace(/\.txt$/i, ''));
   el.file.value = '';
 });
-el.play.addEventListener('click', () => (state.playing ? pause() : play()));
+el.play.addEventListener('click', play);
+el.pause.addEventListener('click', pause);
 el.wpm.addEventListener('input', () => {
   state.wpm = Number(el.wpm.value);
   if (state.playing) anchor();
