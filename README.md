@@ -26,4 +26,4 @@ The script needs Node 22 and Playwright 1.63.0 with Chromium. It serves this fol
 
 ## Deploy
 
-Every push to `main` runs `.github/workflows/pages.yml`. The `verify` job runs `node verify.js`. If it passes, the `deploy` job publishes the repo root to GitHub Pages.
+Every pull request and every push to `main` runs `.github/workflows/pages.yml`. The `verify` job runs `node verify.js`. On `main`, if it passes, the `deploy` job publishes the repo root to GitHub Pages. Work lands through pull requests, never by a direct push to `main`.
