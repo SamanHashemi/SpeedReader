@@ -239,11 +239,27 @@ function pause() {
   render();
 }
 
+// A tap on the word steps back to the start of the previous sentence, or of
+// the current one when the shown word is mid-sentence. Landing on a sentence
+// start means a later play() rewinds nowhere, so a tap while paused and the
+// Play that follows show the same word.
+function back() {
+  if (!state.words.length) return;
+  const shown = Math.max(0, state.index - 1);
+  let start = sentenceStart(shown);
+  if (start === shown && start > 0) start = sentenceStart(start - 1);
+  state.index = start + 1;
+  if (state.playing) anchor();
+  else save();
+  render();
+}
+
 el.file.addEventListener('change', async () => {
   const file = el.file.files[0];
   if (file) open(await file.text(), file.name.replace(/\.txt$/i, ''));
   el.file.value = '';
 });
+el.word.addEventListener('click', back);
 el.play.addEventListener('click', play);
 el.pause.addEventListener('click', pause);
 el.wpm.addEventListener('input', () => {
