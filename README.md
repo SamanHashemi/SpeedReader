@@ -16,7 +16,7 @@ The reader holds longer at the end of a sentence, longer still at a paragraph br
 
 The counter under the word shows how far along you are.
 
-The app remembers where you are and your speed for each file. Your files are listed under the Open button, newest first, and tapping one switches to it. When you come back, the app reopens the last file you read. Tap × next to a file to forget it. All of this lives in Safari on your phone, so clearing website data removes it.
+The app remembers where you are and your speed for each file. Your files are listed under the Open button, newest first, and tapping one switches to it. When you come back, the app reopens the last file you read. After a pause or a reopen, reading restarts from the beginning of the sentence you were in. Tap × next to a file to forget it. All of this lives in Safari on your phone, so clearing website data removes it.
 
 ## Verify
 
@@ -24,7 +24,7 @@ The app remembers where you are and your speed for each file. Your files are lis
 node verify.js
 ```
 
-The script needs Node 22 and Playwright 1.63.0 with Chromium. It serves this folder, opens it at iPhone size (390 by 844), and checks the file load, focal alignment, slider, and button states. It then plays 600 words at 300 wpm for a minute and checks that between 285 and 315 words appeared. Then it checks that progress, speed, and the file list survive a reload, and that a fresh browser starts empty. Last it plays a file of short paragraphs for 8 seconds and checks that sentence ends, paragraph ends, and commas hold longer than plain words by the expected ratios while the average rate stays at 300. It prints one `ok` or `FAIL` line per check and takes about 80 seconds.
+The script needs Node 22 and Playwright 1.63.0 with Chromium. It serves this folder, opens it at iPhone size (390 by 844), and checks the file load, focal alignment, slider, and button states. It then plays 600 words at 300 wpm for a minute and checks that between 285 and 315 words appeared. Then it checks that progress, speed, and the file list survive a reload, and that a fresh browser starts empty. Then it plays a file of short paragraphs for 8 seconds and checks that sentence ends, paragraph ends, and commas hold longer than plain words by the expected ratios while the average rate stays at 300. Last it checks that resuming after a pause, and after a reload, restarts at the first word of the sentence. It prints one `ok` or `FAIL` line per check and takes about 90 seconds.
 
 ## Deploy
 
