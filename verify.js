@@ -34,6 +34,19 @@ function count(text) {
 function orpIndex(len) {
   return Math.min(4, Math.ceil((len - 1) / 4));
 }
+// Same hold table as app.js, so the pacing check reads as the table it checks.
+const pace = { short: 0.8, long: 1.3, paragraph: 2.5, sentence: 2, clause: 1.5 };
+function weight(text, endsParagraph = false) {
+  const length = text.length <= 3 ? pace.short : text.length >= 10 ? pace.long : 1;
+  const last = text.replace(/["'\u201d\u2019)\]}]+$/, '').slice(-1);
+  const end = endsParagraph ? pace.paragraph : '.!?'.includes(last) ? pace.sentence : ',;:\u2013\u2014'.includes(last) ? pace.clause : 1;
+  return length * end;
+}
+function median(xs) {
+  const sorted = xs.slice().sort((a, b) => a - b);
+  const mid = sorted.length >> 1;
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
 
 let failed = false;
 async function check(name, fn) {
@@ -240,6 +253,51 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     assert.strictEqual(await fresh.locator('#library li').count(), 0);
     assert.strictEqual(await text(fresh, '#title'), '');
     await context.close();
+  });
+
+  const pacingText = Array(20).fill('one two three. four five six, seven eight nine ten eleven twelve.').join('\n\n');
+  let shown = [];
+  let pacingElapsed = 0;
+
+  await check('pacing holds on sentence and paragraph ends', async () => {
+    await openFile(page, pacingText, 'Pacing.txt');
+    await page.fill('#wpm', '300');
+    await page.evaluate(() => {
+      const el = document.querySelector('#word');
+      window.__shown = [];
+      window.__last = el.textContent;
+      new MutationObserver(() => {
+        if (el.textContent !== window.__last) {
+          window.__last = el.textContent;
+          window.__shown.push([el.textContent, performance.now()]);
+        }
+      }).observe(el, { childList: true, characterData: true, subtree: true });
+      window.__t0 = performance.now();
+    });
+    await page.click('#play');
+    await page.waitForTimeout(8000);
+    await page.click('#play');
+    [shown, pacingElapsed] = await page.evaluate(() => [window.__shown, performance.now() - window.__t0]);
+    const durations = {};
+    shown.slice(0, -1).forEach(([word, t], i) => (durations[word] = durations[word] || []).push(shown[i + 1][1] - t));
+    const medians = Object.fromEntries(Object.entries(durations).map(([w, d]) => [w, median(d)]));
+    console.log(`  medians ms ${Object.entries(medians).map(([w, m]) => `${w} ${m.toFixed(0)}`).join(', ')}`);
+    const expected = [
+      ['three.', 'two', weight('three.') / weight('two')],
+      ['twelve.', 'eleven', weight('twelve.', true) / weight('eleven')],
+      ['six,', 'four', weight('six,') / weight('four')],
+    ];
+    for (const [slow, fast, ratio] of expected) {
+      for (const w of [slow, fast]) assert(durations[w] && durations[w].length >= 3, `${w} seen ${(durations[w] || []).length} times`);
+      const measured = medians[slow] / medians[fast];
+      assert(Math.abs(measured - ratio) <= 0.2 * ratio, `${slow} / ${fast} = ${measured.toFixed(2)}, expected ${ratio}`);
+    }
+  });
+
+  await check('mean rate stays literal', async () => {
+    const wpm = (shown.length / pacingElapsed) * 60000;
+    console.log(`  measured ${wpm.toFixed(0)} wpm over ${shown.length} words in ${pacingElapsed.toFixed(0)}ms`);
+    assert(Math.abs(wpm - 300) <= 30, `${wpm.toFixed(0)} wpm`);
   });
 
   await browser.close();

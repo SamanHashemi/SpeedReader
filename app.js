@@ -1,4 +1,4 @@
-const state = { book: null, words: [], index: 0, wpm: 300, playing: false };
+const state = { book: null, words: [], cum: [0], index: 0, wpm: 300, playing: false };
 let library = [];
 
 let timer = 0;
@@ -61,6 +61,37 @@ function orpIndex(len) {
   return Math.min(4, Math.ceil((len - 1) / 4));
 }
 
+// How long a word holds, relative to a mid-sentence word of middling length.
+const PACE = {
+  short: 0.8,
+  long: 1.3,
+  paragraph: 2.5,
+  end: { '.': 2, '!': 2, '?': 2, ',': 1.5, ';': 1.5, ':': 1.5, '\u2013': 1.5, '\u2014': 1.5 },
+};
+
+function rawWeight(text, endsParagraph) {
+  const length = text.length <= 3 ? PACE.short : text.length >= 10 ? PACE.long : 1;
+  const last = text.replace(/["'\u201d\u2019)\]}]+$/, '').slice(-1);
+  return length * (endsParagraph ? PACE.paragraph : PACE.end[last] || 1);
+}
+
+function tokenize(text) {
+  const words = [];
+  for (const paragraph of text.split(/\n\s*\n/)) {
+    const texts = paragraph.split(/\s+/).filter(Boolean);
+    texts.forEach((t, i) => words.push({ text: t, weight: rawWeight(t, i === texts.length - 1) }));
+  }
+  // Weights are scaled to a mean of exactly 1, so N on the slider is still N
+  // words per minute over the book. Pacing only moves time between words.
+  const mean = words.reduce((sum, w) => sum + w.weight, 0) / words.length || 1;
+  const cum = [0];
+  for (const w of words) {
+    w.weight /= mean;
+    cum.push(cum[cum.length - 1] + w.weight);
+  }
+  return { words, cum };
+}
+
 function done() {
   return state.index >= state.words.length;
 }
@@ -82,7 +113,7 @@ function row(entry) {
 
 function render() {
   const { book, words, index, wpm, playing } = state;
-  const word = words[Math.max(0, index - 1)] || '';
+  const word = (words[Math.max(0, index - 1)] || { text: '' }).text;
   const i = orpIndex(word.length);
   before.textContent = word.slice(0, i);
   focal.textContent = word.slice(i, i + 1);
@@ -99,7 +130,7 @@ function render() {
 // moment play started rather than against the previous tick. A wpm change
 // while playing re-anchors so the new rate applies from now.
 function schedule() {
-  const due = anchorTime + (state.index - anchorIndex) * (60000 / state.wpm);
+  const due = anchorTime + (state.cum[state.index] - state.cum[anchorIndex]) * (60000 / state.wpm);
   timer = setTimeout(tick, Math.max(0, due - performance.now()));
 }
 
@@ -132,7 +163,7 @@ function save() {
 function open(text, title) {
   pause();
   const id = hashText(text);
-  const words = text.split(/\s+/).filter(Boolean);
+  const { words, cum } = tokenize(text);
   let entry = library.find((e) => e.id === id);
   if (entry) {
     entry.title = title;
@@ -144,6 +175,7 @@ function open(text, title) {
   }
   state.book = { id, title };
   state.words = words;
+  state.cum = cum;
   state.index = entry.index;
   state.wpm = entry.wpm;
   el.wpm.value = state.wpm;
@@ -164,6 +196,7 @@ function remove(id) {
     clearTimeout(timer);
     state.book = null;
     state.words = [];
+    state.cum = [0];
     state.index = 0;
     state.playing = false;
   }
