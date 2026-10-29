@@ -285,7 +285,7 @@ async function openFile(page, t, name = `speed-reader-${process.pid}-${fileCount
     });
     await page.click('#play');
     await page.waitForTimeout(8000);
-    await page.click('#play');
+    await page.click('#pause');
     [shown, pacingElapsed] = await page.evaluate(() => [window.__shown, performance.now() - window.__t0]);
     const durations = {};
     shown.slice(0, -1).forEach(([word, t], i) => (durations[word] = durations[word] || []).push(shown[i + 1][1] - t));
